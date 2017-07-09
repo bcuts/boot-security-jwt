@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
-import com.github.iyboklee.api.model.ApiResult;
+import com.github.iyboklee.api.model.response.ApiResult;
 import com.github.iyboklee.exception.ServiceRuntimeException;
 import com.github.iyboklee.exception.UnauthorizedException;
 

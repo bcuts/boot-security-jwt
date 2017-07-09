@@ -1,17 +1,18 @@
 /**
  * @Author yboklee (iyboklee@gmail.co.kr)
  */
-package com.github.iyboklee.api.model;
+package com.github.iyboklee.api.model.response;
 
 import org.springframework.http.HttpStatus;
 
 import lombok.Getter;
 
+@Getter
 public class ApiResult<T> {
 
-    @Getter private boolean success;
-    @Getter private ApiError error;
-    @Getter private T response;
+    private boolean success;
+    private ApiError error;
+    private T response;
 
     public ApiResult(T response) {
         this.response = response;

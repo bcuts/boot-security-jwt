@@ -11,7 +11,6 @@ spring:
     encoding: UTF-8
 server:
   port: 8080
-  context-path: /api
 logging:
   config: classpath:logback.xml
 jwt:

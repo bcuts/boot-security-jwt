@@ -10,6 +10,8 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +19,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.CharEncoding;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.GrantedAuthority;
@@ -41,36 +44,34 @@ public class JwtAuthenticationTokenFilter extends GenericFilterBean {
             throws IOException, ServletException {
         HttpServletRequest request = (HttpServletRequest) req;
         HttpServletResponse response = (HttpServletResponse) res;
-        String authorization = extractAuthorizationToken(request);
+
 
         if (SecurityContextHolder.getContext().getAuthentication() == null) {
-            if (authorization != null) {
-                if (log.isDebugEnabled())
-                    log.debug("Jwt authorization request detected: {}", authorization);
+            String authorizationToken = obtainAuthorizationToken(request);
+            if (authorizationToken != null) {
+                try {
+                    Map<String, Object> claims = verify(authorizationToken);
+                    if (log.isDebugEnabled())
+                        log.debug("Jwt parse result: {}", claims);
 
-                String[] parts = authorization.split(" ");
-                if (parts.length == 2) {
-                    String scheme = parts[0];
-                    String credentials = parts[1];
-
-                    if (BEARER.matcher(scheme).matches()) {
-                        try {
-                            Map<String, Object> claims = verify(credentials);
-                            if (log.isDebugEnabled())
-                                log.debug("Jwt parse result: {}", claims);
-
-                            String username = MapUtils.getString(claims, "username");
-                            List<GrantedAuthority> authorities = getAuthorities(claims);
-
-                            if (username != null && authorities.size() > 0) {
-                                ApiUserAuthenticationToken authentication = new ApiUserAuthenticationToken(username, null, authorities);
-                                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                                SecurityContextHolder.getContext().setAuthentication(authentication);
-                            }
-                        } catch (Exception e) {
-                            log.warn("Jwt processing failed: {}", e.getMessage());
-                        }
+                    //-- 만료 10분 전
+                    if (canRefresh(claims, 60 * 10)) {
+                        String newAuthorizationToken = jwt.refreshToken(authorizationToken);
+                        response.setHeader("api_key", newAuthorizationToken);
                     }
+
+                    String username = MapUtils.getString(claims, "username");
+                    String email = MapUtils.getString(claims, "email");
+                    List<GrantedAuthority> authorities = obtainAuthorities(claims);
+
+                    if (username != null && email != null && authorities.size() > 0) {
+                        ApiUserAuthenticationToken authentication =
+                                new ApiUserAuthenticationToken(new JwtAuthentication(username, email), null, authorities);
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    }
+                } catch (Exception e) {
+                    log.warn("Jwt processing failed: {}", e.getMessage());
                 }
             }
         }
@@ -84,16 +85,45 @@ public class JwtAuthenticationTokenFilter extends GenericFilterBean {
         chain.doFilter(request, response);
     }
 
+    private boolean canRefresh(Map<String, Object> claims, int rangeMinutes) {
+        if (claims.containsKey("exp")) {
+            long expiration = MapUtils.getLongValue(claims, "exp", 0);
+            if (expiration != 0) {
+                long remainTime = expiration - (System.currentTimeMillis() / 1000L);
+                return remainTime < rangeMinutes;
+            }
+        }
+
+        return false;
+    }
+
     @SuppressWarnings("unchecked")
-    private List<GrantedAuthority> getAuthorities(Map<String, Object> claims) {
+    private List<GrantedAuthority> obtainAuthorities(Map<String, Object> claims) {
         Collection<Map<String, String>> authMaps = (Collection<Map<String, String>>) claims.get("roles");
         return authMaps.stream()
                 .map(authMap -> new SimpleGrantedAuthority(MapUtils.getString(authMap, "authority", "ROLE_ANONYMOUS")))
                 .collect(Collectors.toList());
     }
 
-    protected String extractAuthorizationToken(HttpServletRequest request) {
-        return request.getHeader(tokenHeader);
+    protected String obtainAuthorizationToken(HttpServletRequest request) {
+        String token = request.getHeader(tokenHeader);
+        if (token != null) {
+            if (log.isDebugEnabled())
+                log.debug("Jwt authorization request detected: {}", token);
+            try {
+                token = URLDecoder.decode(token, CharEncoding.UTF_8);
+                String[] parts = token.split(" ");
+                if (parts.length == 2) {
+                    String scheme = parts[0];
+                    String credentials = parts[1];
+                    return BEARER.matcher(scheme).matches() ? credentials : null;
+                }
+            } catch (UnsupportedEncodingException e) {
+                log.error(e.getMessage(), e);
+            }
+        }
+
+        return null;
     }
 
     protected Map<String, Object> verify(String token) throws Exception {

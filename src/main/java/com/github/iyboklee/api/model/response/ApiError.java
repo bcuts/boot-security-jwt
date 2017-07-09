@@ -1,16 +1,17 @@
 /**
  * @Author yboklee (iyboklee@gmail.co.kr)
  */
-package com.github.iyboklee.api.model;
+package com.github.iyboklee.api.model.response;
 
 import org.springframework.http.HttpStatus;
 
 import lombok.Getter;
 
+@Getter
 public class ApiError {
 
-    @Getter private int status;
-    @Getter private String message;
+    private int status;
+    private String message;
 
     public ApiError(Throwable throwable, HttpStatus status) {
         this(throwable.getMessage(), status);

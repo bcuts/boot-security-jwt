@@ -17,6 +17,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 import com.github.iyboklee.security.ApiUserAuthenticationProvider;
 import com.github.iyboklee.security.EntryPointUnauthorizedHandler;
+import com.github.iyboklee.security.JwtAccessDeniedHandler;
 import com.github.iyboklee.security.JwtAuthenticationTokenFilter;
 
 @Configuration
@@ -25,6 +26,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Value("${jwt.token.role}") private String role;
 
+    @Autowired private JwtAccessDeniedHandler accessDeniedHandler;
     @Autowired private EntryPointUnauthorizedHandler unauthorizedHandler;
     @Autowired private ApiUserAuthenticationProvider apiUserAuthenticationProvider;
 
@@ -53,15 +55,16 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .headers()
                     .disable()
                 .exceptionHandling()
+                    .accessDeniedHandler(accessDeniedHandler)
                     .authenticationEntryPoint(unauthorizedHandler)
                     .and()
                 .sessionManagement()
                     .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                     .and()
                 .authorizeRequests()
-                    .antMatchers("/auth/**").permitAll()
-                    .antMatchers("/**").hasRole(role)
-                    .anyRequest().authenticated()
+                    .antMatchers("/api/auth/**").permitAll()
+                    .antMatchers("/api/**").hasRole(role)
+                    .anyRequest().permitAll()
                     .and()
                 .formLogin()
                     .disable();
