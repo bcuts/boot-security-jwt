@@ -1,4 +1,5 @@
 ### Spring Boot Security Jwt
+
   - Jwt 인증기반 REST API 서버를 Spring boot, security를 사용해 구현한다.
   - oauth2 인증 체계는 사용하지 않으므로, spring-security-oauth2는 사용하지 않는다.
   - 커스텀 [Jwt 인증 필터 (JwtAuthenticationTokenFilter)](src/main/java/com/github/iyboklee/security/JwtAuthenticationTokenFilter.java)와 [커스텀 인증 Provider (ApiUserAuthenticationProvider)](/src/main/java/com/github/iyboklee/security/ApiUserAuthenticationProvider.java)를 사용한다.
